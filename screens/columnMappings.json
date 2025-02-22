@@ -1,0 +1,44 @@
+
+{
+
+    "leiji": {
+        "gtstation": "高铁污水处理厂",
+        "yaqistation": "亚琦处理站",
+        "yinzhuangstation": "殷庄处理站",
+        "xidiyastation": "西地亚处理站",
+        "fivestation": "5000吨处理站"
+    },
+    "yj_5000":{
+        "tp":"出水总磷",
+        "nh3":"出水氨氮",
+        "cod":"出水COD",
+        "lqllw":"污水量",
+        "lqllr":"河水量",
+        "lwji":"进水总累计"
+
+    },
+    "gt_data":{
+        "gt_in_lj":"高铁进水累计",
+        "gt_in_ll":"高铁进水流量",
+        "gt_in_nh3":"高铁进水氨氮",
+        "gt_in_cod":"高铁进水COD",
+        "gt_out_lj":"高铁出水累计",
+        "gt_out_ll":"高铁出水流量",
+        "gt_out_nh3":"高铁出水氨氮",
+        "gt_out_cod":"高铁出水COD",
+        "gt_out_tn":"高铁出水总氮",
+        "gt_out_tp":"高铁出水总磷"
+    },
+    "huayan_data":{
+        "sample_name":"项目名称",
+        "cod":"化学需氧量",
+        "nh3":"氨氮",
+        "tn":"总氮",
+        "tp":"总磷",
+        "ph":"酸碱度",
+        "ss":"悬浮物",
+        "sw":"水温"
+
+    }
+
+}

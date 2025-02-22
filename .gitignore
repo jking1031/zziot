@@ -1,0 +1,110 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+logs/
+*.log
+
+# macOS
+.DS_Store
+*.pem
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# local env files
+.env*.local
+.env
+.env.development
+.env.test
+.env.production
+
+# typescript
+*.tsbuildinfo
+
+# System Cache
+Library/
+.cache/
+*.cshelpindex
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IDE - WebStorm/IntelliJ
+.idea/
+*.iml
+*.iws
+
+# Chrome Cache
+Cache/
+Code Cache/
+
+# Application Support
+Library/Application Support/
+
+# Build
+build/
+dist/
+
+# XCode
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Android/IntelliJ
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+
+# iOS
+pods/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+# Temporary files
+*.swp
+*.swo
+*.tmp
+*.temp
+.DS_Store?
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
