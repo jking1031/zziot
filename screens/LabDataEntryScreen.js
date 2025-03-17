@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import RNPickerSelect from 'react-native-picker-select';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -114,6 +115,7 @@ const LabDataEntryScreen = () => {
   };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingModalVisible, setLoadingModalVisible] = useState(false);
 
   const handleSubmit = async () => {
     // 验证数据
@@ -156,6 +158,7 @@ const LabDataEntryScreen = () => {
     if (!isValid) return;
 
     setIsSubmitting(true);
+    setLoadingModalVisible(true);
 
     try {
       const formattedSamples = samples.map(sample => ({
@@ -170,7 +173,7 @@ const LabDataEntryScreen = () => {
         testDate: sample.time
       }));
 
-      const response = await fetch('http://112.28.56.235:13100/submit', {
+      const response = await fetch('https://zziot.jzz77.cn:9003/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -195,6 +198,7 @@ const LabDataEntryScreen = () => {
         throw new Error(data.error || '提交失败');
       }
 
+      setLoadingModalVisible(false);
       Alert.alert('成功', '数据已成功提交');
       // 重置表单
       setSamples([{
@@ -214,6 +218,7 @@ const LabDataEntryScreen = () => {
       Alert.alert('错误', error.message || '提交失败，请稍后重试');
     } finally {
       setIsSubmitting(false);
+      setLoadingModalVisible(false);
     }
   };
 
@@ -496,6 +501,19 @@ const LabDataEntryScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* 加载提示 Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={loadingModalVisible}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.loadingModalView, { backgroundColor: colors.card }]}>
+            <Text style={[styles.loadingText, { color: colors.text }]}>正在提交...</Text>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -732,6 +750,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     fontWeight: 'bold',
+  },
+  loadingModalView: {
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

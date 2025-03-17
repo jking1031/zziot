@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Alert } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { Dimensions } from 'react-native';
+import * as XLSX from 'xlsx';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 const AODataQueryScreen = () => {
   const { isDarkMode, colors } = useTheme();
@@ -15,6 +19,8 @@ const AODataQueryScreen = () => {
   const [loading, setLoading] = useState(false);
   const [aoData, setAoData] = useState([]);
   const [showAOPicker, setShowAOPicker] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
 
   const poolConfigs = {
@@ -91,7 +97,7 @@ const AODataQueryScreen = () => {
       const formattedEndDate = endDate.toISOString().split('T')[0];
       
       const response = await fetch(
-        `http://112.28.56.235:13100/api/sub-pools?aoName=${encodeURIComponent(selectedAO)}&startDate=${formattedStartDate}&endDate=${formattedEndDate}`
+        `https://zziot.jzz77.cn:9003/api/sub-pools?aoName=${encodeURIComponent(selectedAO)}&startDate=${formattedStartDate}&endDate=${formattedEndDate}`
       );
       
       if (!response.ok) {
@@ -151,7 +157,85 @@ const AODataQueryScreen = () => {
     }
   };
 
+  const exportToExcel = async () => {
+    if (aoData.length === 0) {
+      Alert.alert('提示', '没有数据可导出');
+      return;
+    }
 
+    try {
+      // 获取当前选中AO池的配置
+      const currentConfig = poolConfigs[selectedAO] || [];
+      if (currentConfig.length === 0) {
+        throw new Error('未找到对应的AO池配置');
+      }
+
+      // 准备导出数据
+      const exportData = aoData.map(row => {
+        const newRow = {
+          '日期': row.date
+        };
+        // 添加每个子池的数据
+        currentConfig.forEach((pool, index) => {
+          newRow[pool.name] = Number(row.values[index]).toFixed(2);
+        });
+        return newRow;
+      });
+
+      // 创建工作表
+      const ws = XLSX.utils.json_to_sheet(exportData);
+
+      // 设置列宽
+      const colWidths = [
+        { wch: 12 }, // 日期列宽
+        ...currentConfig.map(() => ({ wch: 15 })) // 数据列宽
+      ];
+      ws['!cols'] = colWidths;
+
+      // 创建工作簿
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'DO数据');
+
+      // 生成Excel文件
+      const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+
+      // 生成文件名
+      const formatDateForFileName = (date) => {
+        return date.toISOString().split('T')[0].replace(/-/g, '');
+      };
+
+      // 生成安全的文件名（移除可能导致问题的字符）
+      const safeAOName = selectedAO.replace(/#/g, '号');
+      const startDateStr = formatDateForFileName(startDate);
+      const endDateStr = formatDateForFileName(endDate);
+      const timestamp = Date.now();
+      
+      // 确保文件名不包含特殊字符
+      const fileName = `${safeAOName}_DO数据_${startDateStr}_${endDateStr}.xlsx`;
+      const filePath = FileSystem.documentDirectory + fileName;
+
+      // 写入文件
+      await FileSystem.writeAsStringAsync(filePath, wbout, {
+        encoding: FileSystem.EncodingType.Base64
+      });
+
+      // 分享文件
+      await Sharing.shareAsync(filePath, {
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        dialogTitle: `${selectedAO} DO数据 ${startDate.toLocaleDateString('zh-CN')} 至 ${endDate.toLocaleDateString('zh-CN')}`,
+        UTI: 'com.microsoft.excel.xlsx'
+      });
+
+      // 删除临时文件
+      await FileSystem.deleteAsync(filePath).catch(err => 
+        console.warn('清理临时文件失败:', err)
+      );
+
+    } catch (error) {
+      console.error('导出失败:', error);
+      Alert.alert('错误', '导出数据失败');
+    }
+  };
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -208,20 +292,33 @@ const AODataQueryScreen = () => {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={[styles.queryButton, { backgroundColor: colors.primary }]}
-          onPress={fetchAOData}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.queryButtonText}>查询</Text>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.queryButton, loading && { opacity: 0.7 }]}
+            onPress={fetchAOData}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <>
+                <Ionicons name="search" size={20} color="#fff" />
+                <Text style={styles.queryButtonText}>查询</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {aoData.length > 0 && (
+            <TouchableOpacity
+              style={styles.exportButton}
+              onPress={exportToExcel}
+            >
+              <Ionicons name="download" size={20} color="#fff" />
+              <Text style={styles.exportButtonText}>导出</Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+        </View>
       </View>
-
-
 
       <Modal
         animationType="slide"
@@ -258,30 +355,54 @@ const AODataQueryScreen = () => {
         </View>
       </Modal>
 
-
-
       {aoData.length > 0 && (
-        <ScrollView horizontal>
-          <View style={styles.tableContainer}>
-            <View style={[styles.tableHeader, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.headerCell, styles.dateCell]}>日期</Text>
-              {poolConfigs[selectedAO]?.map((pool) => (
-                <Text key={pool.key} style={[styles.headerCell, styles.valueCell]}>{pool.name}</Text>
-              ))}
-            </View>
-            {aoData.map((data, index) => (
-              <View
-                key={data.date}
-                style={[styles.tableRow, { backgroundColor: colors.card }]}
-              >
-                <Text style={[styles.cell, styles.dateCell, { color: colors.text }]}>{data.date}</Text>
-                {data.values.map((value, i) => (
-                  <Text key={i} style={[styles.cell, styles.valueCell, { color: colors.text }]}>{value.toFixed(2)}</Text>
+        <>
+          <View style={[styles.paginationInfo, { backgroundColor: colors.card }]}>
+            <Text style={{ color: colors.text }}>总记录数: {aoData.length} | 当前页: {currentPage} / {Math.ceil(aoData.length / itemsPerPage)}</Text>
+          </View>
+          <ScrollView horizontal>
+            <View style={styles.tableContainer}>
+              <View style={[styles.tableHeader, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.headerCell, styles.dateCell]}>日期</Text>
+                {poolConfigs[selectedAO]?.map((pool) => (
+                  <Text key={pool.key} style={[styles.headerCell, styles.valueCell]}>{pool.name}</Text>
                 ))}
               </View>
-            ))}
+              {aoData
+                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                .map((data, index) => (
+                  <View
+                    key={data.date}
+                    style={[styles.tableRow, { backgroundColor: colors.card }]}
+                  >
+                    <Text style={[styles.cell, styles.dateCell, { color: colors.text }]}>{data.date}</Text>
+                    {data.values.map((value, i) => (
+                      <Text key={i} style={[styles.cell, styles.valueCell, { color: colors.text }]}>{value.toFixed(2)}</Text>
+                    ))}
+                  </View>
+              ))}
+            </View>
+          </ScrollView>
+          <View style={[styles.paginationContainer, { backgroundColor: colors.card }]}>
+            <TouchableOpacity
+              style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+              onPress={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              <Text style={styles.paginationButtonText}>上一页</Text>
+            </TouchableOpacity>
+            <Text style={[styles.paginationText, { color: colors.text }]}>
+              {currentPage} / {Math.ceil(aoData.length / itemsPerPage)}
+            </Text>
+            <TouchableOpacity
+              style={[styles.paginationButton, currentPage >= Math.ceil(aoData.length / itemsPerPage) && styles.paginationButtonDisabled]}
+              onPress={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(aoData.length / itemsPerPage)))}
+              disabled={currentPage >= Math.ceil(aoData.length / itemsPerPage)}
+            >
+              <Text style={styles.paginationButtonText}>下一页</Text>
+            </TouchableOpacity>
           </View>
-        </ScrollView>
+        </>
       )}
     </ScrollView>
   );
@@ -325,17 +446,58 @@ const styles = StyleSheet.create({
   dateButtonText: {
     fontSize: 16,
   },
-  queryButton: {
-    padding: 16,
-    borderRadius: 8,
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 16,
+    gap: 12,
+  },
+  queryButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#2196F3',
     justifyContent: 'center',
-    marginTop: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  exportButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   queryButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
+  },
+  exportButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   modalOverlay: {
     flex: 1,
@@ -425,33 +587,44 @@ const styles = StyleSheet.create({
   valueCell: {
     width: 100,
   },
-
-  tableContainer: {
-    marginTop: 20,
-  },
-  tableHeader: {
+  paginationContainer: {
     flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
   },
-  tableRow: {
-    flexDirection: 'row',
+  paginationButton: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginHorizontal: 8,
   },
-  headerCell: {
+  paginationButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  paginationButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  paginationText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  paginationInfo: {
     padding: 12,
-    color: 'white',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  cell: {
-    padding: 12,
-    textAlign: 'center',
-    fontSize: 16
-  },
-  dateCell: {
-    width: 120,
-  },
-  valueCell: {
-    width: 100,
+    alignItems: 'center',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
   },
 });
+
 
 export default AODataQueryScreen;

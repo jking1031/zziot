@@ -1,0 +1,52 @@
+workflows:
+  ios-production:
+    name: iOS Production
+    instance_type: mac_mini
+    max_build_duration: 60
+    environment:
+      node: 16.x
+      xcode: 14.2
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.zziot.app"
+        APP_VERSION: "1.5.1"
+        # 添加您的环境变量
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/Library/Caches/CocoaPods
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+    scripts:
+      - name: 设置Node.js并安装依赖
+        script: |
+          npm install
+      - name: 安装CocoaPods依赖
+        script: |
+          cd ios && pod install --repo-update
+      - name: 构建iOS应用
+        script: |
+          cd ios
+          xcodebuild clean archive -workspace app.xcworkspace -scheme app -archivePath build/app.xcarchive
+      - name: 导出IPA
+        script: |
+          cd ios
+          xcodebuild -exportArchive -archivePath build/app.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios/ipa
+    artifacts:
+      - ios/build/ios/ipa/*.ipa
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      email:
+        recipients:
+          - your.email@example.com
+        notify:
+          success: true
+          failure: true
+      # 如果您想发布到App Store
+      app_store_connect:
+        apple_id: $APPLE_ID  # 设置为您在Codemagic中定义的环境变量
+        password: $APP_SPECIFIC_PASSWORD 

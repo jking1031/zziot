@@ -58,9 +58,12 @@ const styles = StyleSheet.create({
   },
   cardsContainer: {
     padding: 16,
-    gap: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   card: {
+    width: '48%',
     borderRadius: 12,
     padding: 20,
     elevation: 3,
@@ -71,6 +74,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+    marginBottom: 16,
   },
   cardContent: {
     alignItems: 'center',

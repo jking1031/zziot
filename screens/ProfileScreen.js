@@ -1,22 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, Switch, ScrollView, Modal, Alert } from 'react-native';
+import { Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, Switch, ScrollView, Modal, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
+import Constants from 'expo-constants';
+
+// 角色ID与角色信息的映射
+const roleMap = {
+  1: { name: '管理员', description: '系统最高权限，可访问所有功能' },
+  2: { name: '部门管理员', description: '管理部门内的用户和数据' },
+  3: { name: '运行班组', description: '运行相关功能的操作权限' },
+  4: { name: '化验班组', description: '化验数据及相关功能的操作权限' },
+  5: { name: '机电班组', description: '机电设备及相关功能的操作权限' },
+  6: { name: '污泥车间', description: '污泥处理相关功能的操作权限' },
+  7: { name: '5000吨处理站', description: '处理站相关功能的操作权限' },
+  8: { name: '附属设施', description: '附属设施相关功能的操作权限' },
+  9: { name: '备用权限', description: '未来扩展使用的备用权限组' },
+};
 
 const ProfileScreen = () => {
   const navigation = useNavigation();
   const { isDarkMode, toggleTheme, followSystem, toggleFollowSystem, colors } = useTheme();
   const [language, setLanguage] = useState('中文');
   const [showAvatarModal, setShowAvatarModal] = useState(false);
-  const { user, updateUserInfo, logout } = useAuth();
+  const { user, updateUserInfo, logout, userRoles, getUserRoles, isAdmin } = useAuth();
   const [userInfo, setUserInfo] = useState({
     avatar_seed: user?.avatar_seed || Math.random().toString(36).substring(2, 15),
     username: user?.username || '',
     department: user?.department || '',
-    phone: user?.phone || ''
+    phone: user?.phone || '',
+    company: user?.company || ''
   });
+  const [loadingRoles, setLoadingRoles] = useState(false);
+  const [roles, setRoles] = useState([]);
 
   useEffect(() => {
     if (user) {
@@ -24,10 +42,53 @@ const ProfileScreen = () => {
         avatar_seed: user.avatar_seed || Math.random().toString(36).substring(2, 15),
         username: user.username || '',
         department: user.department || '',
-        phone: user.phone || ''
+        phone: user.phone || '',
+        company: user.company || ''
       });
+      // 获取用户角色
+      fetchUserRoles();
     }
   }, [user]);
+
+  // 获取用户角色
+  const fetchUserRoles = async () => {
+    if (!user || !user.id) return;
+    
+    setLoadingRoles(true);
+    try {
+      // 特别说明角色是从本地数据获取的
+      console.log('从本地用户数据中获取角色信息');
+      console.log('用户数据:', JSON.stringify(user));
+      
+      // 检查并输出is_name字段
+      if (user.is_name !== undefined) {
+        console.log('用户is_name字段:', user.is_name, '类型:', typeof user.is_name);
+      } else {
+        console.log('用户数据中不存在is_name字段');
+      }
+      
+      // 获取角色
+      const fetchedRoles = await getUserRoles(user.id);
+      setRoles(fetchedRoles);
+      
+      console.log('获取到用户角色:', JSON.stringify(fetchedRoles));
+      
+      // 如果用户是管理员但没有任何角色，确保显示管理员角色
+      if (fetchedRoles.length === 0 && isAdmin) {
+        console.log('用户是管理员但没有角色，设置为管理员角色');
+        setRoles([{ id: 1, name: '管理员' }]);
+      }
+    } catch (error) {
+      console.error('获取用户角色失败:', error);
+      
+      // 错误发生时，如果用户是管理员，显示管理员角色
+      if (isAdmin) {
+        setRoles([{ id: 1, name: '管理员' }]);
+      }
+    } finally {
+      setLoadingRoles(false);
+    }
+  };
 
   const toggleLanguage = () => {
     setLanguage(prev => prev === '中文' ? 'English' : '中文');
@@ -69,8 +130,12 @@ const ProfileScreen = () => {
         </View>
         <View style={styles.infoContainer}>
           <View style={styles.infoRow}>
-            <Text style={[styles.label, { color: colors.text }]}>用户名</Text>
+            <Text style={[styles.label, { color: colors.text }]}>员工</Text>
             <Text style={[styles.value, { color: colors.text }]}>{userInfo.username}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={[styles.label, { color: colors.text }]}>单位</Text>
+            <Text style={[styles.value, { color: colors.text }]}>{userInfo.company || '未设置'}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={[styles.label, { color: colors.text }]}>部门</Text>
@@ -81,6 +146,76 @@ const ProfileScreen = () => {
             <Text style={[styles.value, { color: colors.text }]}>{userInfo.phone}</Text>
           </View>
         </View>
+      </View>
+
+      {/* 用户角色卡片 */}
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <View style={styles.roleHeaderContainer}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>角色权限</Text>
+          <TouchableOpacity 
+            style={styles.refreshButton} 
+            onPress={fetchUserRoles}
+            disabled={loadingRoles}
+          >
+            <Ionicons 
+              name="refresh-circle" 
+              size={24} 
+              color={loadingRoles ? "#999" : "#FF6700"} 
+            />
+          </TouchableOpacity>
+        </View>
+        
+        {loadingRoles ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#FF6700" />
+            <Text style={[styles.loadingText, { color: colors.text }]}>加载角色信息...</Text>
+          </View>
+        ) : isAdmin && (!roles || roles.length === 0) ? (
+          // 对于管理员用户，即使API获取角色失败也显示管理员角色
+          <View style={styles.roleItem}>
+            <View style={styles.roleHeader}>
+              <Ionicons 
+                name="shield-checkmark" 
+                size={20} 
+                color="#FF6700" 
+                style={styles.roleIcon} 
+              />
+              <Text style={[styles.roleName, { color: colors.text }]}>管理员</Text>
+            </View>
+            <Text style={[styles.roleDescription, { color: colors.textSecondary }]}>
+              系统最高权限，可访问所有功能
+            </Text>
+          </View>
+        ) : roles && roles.length > 0 ? (
+          <>
+            {roles.map((role, index) => {
+              // 尝试获取角色ID，role可能是对象或数字
+              const roleId = typeof role === 'object' ? role.id || role.role_id : role;
+              const roleInfo = roleMap[roleId] || { name: `未知角色(ID:${roleId})`, description: '未定义的角色权限' };
+              
+              return (
+                <View key={index} style={styles.roleItem}>
+                  <View style={styles.roleHeader}>
+                    <Ionicons 
+                      name="shield-checkmark" 
+                      size={20} 
+                      color="#FF6700" 
+                      style={styles.roleIcon} 
+                    />
+                    <Text style={[styles.roleName, { color: colors.text }]}>{roleInfo.name}</Text>
+                  </View>
+                  <Text style={[styles.roleDescription, { color: colors.textSecondary }]}>
+                    {roleInfo.description}
+                  </Text>
+                </View>
+              );
+            })}
+          </>
+        ) : (
+          <Text style={[styles.noRolesText, { color: colors.textSecondary }]}>
+            暂无分配角色权限
+          </Text>
+        )}
       </View>
 
       {/* 主题设置卡片 */}
@@ -110,6 +245,15 @@ const ProfileScreen = () => {
           <TouchableOpacity onPress={toggleLanguage} style={[styles.languageButton, { backgroundColor: isDarkMode ? '#333' : '#f0f0f0' }]}>
             <Text style={[styles.languageText, { color: colors.text }]}>{language}</Text>
           </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* 版本信息卡片 */}
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>关于应用</Text>
+        <View style={styles.settingRow}>
+          <Text style={[styles.settingLabel, { color: colors.text }]}>当前版本</Text>
+          <Text style={[styles.versionText, { color: colors.text }]}>v{Constants.expoConfig.version}</Text>
         </View>
       </View>
 
@@ -162,9 +306,17 @@ const ProfileScreen = () => {
                 text: '确定', 
                 onPress: async () => {
                   await logout();
+                  // 清理本地用户信息状态
+                  setUserInfo({
+                    avatar_seed: Math.random().toString(36).substring(2, 15),
+                    username: '',
+                    department: '',
+                    phone: '',
+                    company: ''
+                  });
                   navigation.reset({
                     index: 0,
-                    routes: [{ name: 'Login' }]
+                    routes: [{ name: 'Home' }]
                   });
                 }
               }
@@ -339,6 +491,57 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  versionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  // 角色卡片样式
+  roleItem: {
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  roleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  roleIcon: {
+    marginRight: 8,
+  },
+  roleName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  roleDescription: {
+    fontSize: 14,
+    marginLeft: 28,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+  },
+  loadingText: {
+    marginLeft: 10,
+    fontSize: 14,
+  },
+  noRolesText: {
+    textAlign: 'center',
+    padding: 12,
+    fontSize: 14,
+  },
+  roleHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  refreshButton: {
+    padding: 5,
   },
 });
 
