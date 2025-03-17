@@ -1,52 +1,35 @@
 workflows:
-  ios-production:
+  ios-workflow:
     name: iOS Production
     instance_type: mac_mini
     max_build_duration: 60
     environment:
       node: 16.x
-      xcode: 14.2
-      cocoapods: default
+      xcode: 14.2 # 使用您本地已有的Xcode版本
       vars:
-        BUNDLE_ID: "com.zziot.app"
-        APP_VERSION: "1.5.1"
-        # 添加您的环境变量
+        BUNDLE_ID: "com.zziot.app" # 从您的app.json中获取
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.zziot.app
     cache:
       cache_paths:
         - ~/.npm
         - ~/Library/Caches/CocoaPods
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: main
-          include: true
     scripts:
-      - name: 设置Node.js并安装依赖
+      - name: 安装依赖
         script: |
           npm install
-      - name: 安装CocoaPods依赖
-        script: |
           cd ios && pod install --repo-update
       - name: 构建iOS应用
         script: |
           cd ios
-          xcodebuild clean archive -workspace app.xcworkspace -scheme app -archivePath build/app.xcarchive
-      - name: 导出IPA
-        script: |
-          cd ios
-          xcodebuild -exportArchive -archivePath build/app.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios/ipa
+          xcodebuild -workspace app.xcworkspace -scheme app -configuration Release -archivePath app.xcarchive archive
+          xcodebuild -exportArchive -archivePath app.xcarchive -exportOptionsPlist exportOptions.plist -exportPath IPA
     artifacts:
-      - ios/build/ios/ipa/*.ipa
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
     publishing:
-      email:
-        recipients:
-          - your.email@example.com
-        notify:
-          success: true
-          failure: true
-      # 如果您想发布到App Store
       app_store_connect:
-        apple_id: $APPLE_ID  # 设置为您在Codemagic中定义的环境变量
-        password: $APP_SPECIFIC_PASSWORD 
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID 
